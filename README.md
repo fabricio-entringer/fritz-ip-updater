@@ -1,4 +1,9 @@
-# Fritz IP Updater
+
+# Fritz IP Updater [![Docker Pulls](https://img.shields.io/docker/pulls/entringer/fritz-ip-updater?style=flat-square&logo=docker)](https://hub.docker.com/repository/docker/entringer/fritz-ip-updater) [![Docker Image Size](https://img.shields.io/docker/image-size/entringer/fritz-ip-updater/latest?style=flat-square&logo=docker)](https://hub.docker.com/repository/docker/entringer/fritz-ip-updater)
+
+<p align="center">
+  <img src="assets/fritz-ip-updater-logo.png" alt="Fritz IP Updater Logo" width="300"/>
+</p>
 
 A Python application that monitors your Fritz!Box router's external IP address and automatically updates your dynamic DNS domain when the IP changes.
 
