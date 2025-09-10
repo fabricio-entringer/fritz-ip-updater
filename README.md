@@ -36,6 +36,9 @@ The application requires the following configuration parameters, which should be
 - `DUCKDNS_TOKEN` - Your DuckDNS authentication token
 - `DUCKDNS_DOMAIN` - Your DuckDNS subdomain (without .duckdns.org)
 
+### Application Configuration
+- `UPDATE_INTERVAL_MINUTES` - Interval in minutes between IP checks (default: 5)
+
 *Note: Future versions will support additional dynamic DNS providers.*
 
 ## Setup
@@ -71,6 +74,31 @@ The application requires the following configuration parameters, which should be
    ```bash
    python main.py
    ```
+
+## Docker
+
+The application can be easily deployed using Docker for a containerized environment. This provides better isolation, resource control, and simplified deployment across different systems.
+
+### Quick Start
+```bash
+# Copy and configure environment variables
+cp .env.example .env
+# Edit .env with your credentials
+
+# Build and run with Make commands (recommended)
+make docker-up
+
+# View logs
+make docker-logs
+```
+
+### Features
+- **Lightweight**: Alpine Linux-based image (~50MB)
+- **Security**: Runs as non-root user with resource limits
+- **Persistent data**: Mounts `./data` directory for logs and IP tracking
+- **Health monitoring**: Built-in container health checks
+
+For detailed Docker setup instructions, configuration options, and troubleshooting, see [docker/DOCKER.md](docker/DOCKER.md).
 
 ## Dependencies
 

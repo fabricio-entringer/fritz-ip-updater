@@ -1,11 +1,15 @@
 # Fritz IP Updater Makefile
 
-.PHONY: run install clean help venv
+.PHONY: run install clean help venv requirements docker-up docker-down docker-logs docker-build docker-restart docker-ps
 
 # Default Python interpreter - use .venv if it exists, otherwise system python3
 VENV_DIR := .venv
 PYTHON := $(if $(wildcard $(VENV_DIR)/bin/python),$(VENV_DIR)/bin/python,python3)
 REQUIREMENTS := requirements.txt
+
+# Docker Compose configuration
+COMPOSE_FILE=docker/docker-compose.yml
+ENV_FILE=.env
 
 # Default target
 help:
@@ -45,3 +49,21 @@ clean:
 requirements:
 	pip freeze > $(REQUIREMENTS)
 	@echo "Requirements saved to $(REQUIREMENTS)"
+
+docker-up:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) up -d
+
+docker-down:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) down
+
+docker-logs:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) logs -f
+
+docker-build:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) build
+
+docker-restart:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) restart
+
+docker-ps:
+	docker-compose --env-file $(ENV_FILE) -f $(COMPOSE_FILE) ps

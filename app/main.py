@@ -1,3 +1,4 @@
+import time
 from fritzconnection import FritzConnection
 from fritzconnection.core.exceptions import FritzConnectionException
 from fritzconnection.lib.fritzstatus import FritzStatus
@@ -36,6 +37,16 @@ def save_last_ip(ip):
 
 
 def main():
+    while True:
+        try:
+            execute_check()
+            logger.info(f"Waiting for {config.UPDATE_INTERVAL_MINUTES} minutes before next check...")
+            time.sleep(config.UPDATE_INTERVAL_MINUTES * 60)
+        except KeyboardInterrupt:
+            logger.info("Exiting Fritz IP Updater.")
+            break
+
+def execute_check():    
     """Main entry point for the Fritz IP Updater application."""
     logger.info("Starting Fritz IP Updater...")
     host = config.FRITZBOX_HOST

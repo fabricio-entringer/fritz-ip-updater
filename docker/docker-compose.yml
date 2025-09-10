@@ -1,0 +1,36 @@
+services:
+  fritz-ip-updater:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    container_name: fritz-ip-updater
+    restart: unless-stopped
+    environment:
+      - FRITZBOX_HOST=${FRITZBOX_HOST}
+      - FRITZBOX_USER=${FRITZBOX_USER}
+      - FRITZBOX_PASSWORD=${FRITZBOX_PASSWORD}
+      - DUCKDNS_TOKEN=${DUCKDNS_TOKEN}
+      - DUCKDNS_DOMAIN=${DUCKDNS_DOMAIN}
+      - UPDATE_INTERVAL_MINUTES=${UPDATE_INTERVAL_MINUTES}
+    volumes:
+      # Mount data directory to persist IP tracking and logs
+      - ../data:/app/data
+    # Security settings
+    security_opt:
+      - no-new-privileges:true
+    read_only: true
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m
+    # Resource limits for a lightweight container
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+          cpus: '0.1'
+    # Health check (optional)
+    healthcheck:
+      test: ["CMD-SHELL", "python -c 'import sys; sys.exit(0)'"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

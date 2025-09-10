@@ -13,5 +13,8 @@ FRITZBOX_PASSWORD = os.getenv("FRITZBOX_PASSWORD", "password")
 DUCKDNS_TOKEN = os.getenv("DUCKDNS_TOKEN", "token")
 DUCKDNS_DOMAIN = os.getenv("DUCKDNS_DOMAIN", "domain")  # e.g., "entringer"
 
+# Update Interval in minutes
+UPDATE_INTERVAL_MINUTES = int(os.getenv("UPDATE_INTERVAL_MINUTES", "5"))
+
 # Ensure data directory exists
 os.makedirs("./data", exist_ok=True)
