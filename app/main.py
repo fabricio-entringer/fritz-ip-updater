@@ -56,6 +56,10 @@ def execute_check():
     try:
         fritzbox_status = get_fritzbox_status(host, user, password)
         external_ip = fritzbox_status.get('external_ip')
+        if external_ip is None:
+            logger.error(f"Could not retrieve external IP from Fritz!Box. Error: {fritzbox_status.get('error')}")
+            return
+        
         last_ip = get_last_ip()
 
         if external_ip is None or external_ip != last_ip:
