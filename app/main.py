@@ -35,7 +35,8 @@ def save_last_ip(ip):
         file.write(ip)
 
 
-if __name__ == "__main__":
+def main():
+    """Main entry point for the Fritz IP Updater application."""
     logger.info("Starting Fritz IP Updater...")
     host = config.FRITZBOX_HOST
     user = config.FRITZBOX_USER
@@ -46,16 +47,19 @@ if __name__ == "__main__":
         external_ip = fritzbox_status.get('external_ip')
         last_ip = get_last_ip()
 
-        if external_ip != last_ip:
+        if external_ip is None or external_ip != last_ip:
             logger.info(f"IP change detected: {last_ip} -> {external_ip}")
             if duck_dns_update(external_ip):
                 save_last_ip(external_ip)
                 logger.info("DuckDNS updated successfully.")
             else:
                 logger.error("Failed to update DuckDNS.")
-            # Here you would add the logic to update your dynamic DNS service
         else:
             logger.info(f"No IP change detected. Current IP is still {external_ip}.")
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
+
+
+if __name__ == "__main__":
+    main()

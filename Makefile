@@ -19,7 +19,7 @@ help:
 
 # Run the application
 run:
-	$(PYTHON) main.py
+	$(PYTHON) run.py
 
 # Install dependencies (assumes requirements.txt exists or will be created)
 install:
@@ -35,7 +35,9 @@ venv:
 clean:
 	rm -rf $(VENV_DIR)
 	rm -rf __pycache__
+	rm -rf app/__pycache__
 	rm -rf *.pyc
+	rm -rf app/*.pyc
 	rm -rf .pytest_cache
 	@echo "Cleanup complete"
 

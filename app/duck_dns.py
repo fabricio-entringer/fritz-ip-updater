@@ -3,6 +3,7 @@
 
 import config
 import requests
+from log_config import logger
 
 def duck_dns_update(ip):
     DUCKDNS_TOKEN = config.DUCKDNS_TOKEN
