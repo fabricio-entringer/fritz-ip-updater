@@ -1,0 +1,151 @@
+name: Release and Deploy
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.create_tag.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Create and push tag
+        id: create_tag
+        run: |
+          # Generate tag based on current date and time (y.m.d-h.m format)
+          TAG=$(date -u +"%y.%-m.%-d-%H.%M")
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+          
+          # Configure git
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          
+          # Create and push tag
+          git tag ${TAG}
+          git push origin ${TAG}
+          
+          echo "Created and pushed tag: ${TAG}"
+
+  build-and-push-docker:
+    runs-on: ubuntu-latest
+    needs: create-tag
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_HUB_USERNAME }}
+          password: ${{ secrets.DOCKER_HUB_ACCESS_TOKEN }}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile
+          push: true
+          tags: |
+            ${{ secrets.DOCKER_HUB_USERNAME }}/fritz-ip-updater:latest
+            ${{ secrets.DOCKER_HUB_USERNAME }}/fritz-ip-updater:${{ needs.create-tag.outputs.tag }}
+          platforms: linux/amd64,linux/arm64
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [create-tag, build-and-push-docker]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Fetch full history for changelog generation
+
+      - name: Get previous tag
+        id: get_previous_tag
+        run: |
+          # Get the previous tag (excluding the one we just created)
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ needs.create-tag.outputs.tag }}" | head -n 1)
+          if [ -z "$PREVIOUS_TAG" ]; then
+            # If no previous tag exists, use the first commit
+            PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
+          fi
+          echo "previous_tag=${PREVIOUS_TAG}" >> $GITHUB_OUTPUT
+          echo "Previous tag/commit: ${PREVIOUS_TAG}"
+
+      - name: Generate changelog
+        id: generate_changelog
+        env:
+          DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
+          CURRENT_TAG: ${{ needs.create-tag.outputs.tag }}
+          PREVIOUS_TAG: ${{ steps.get_previous_tag.outputs.previous_tag }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          echo "Generating changelog from ${PREVIOUS_TAG} to ${CURRENT_TAG}"
+          
+          # Generate commit log with format: - commit_message (author)
+          CHANGELOG=$(git log ${PREVIOUS_TAG}..HEAD --pretty=format:"- %s (%an)" --no-merges)
+          
+          # Count commits
+          COMMIT_COUNT=$(git rev-list ${PREVIOUS_TAG}..HEAD --count)
+          
+          # Get list of changed files
+          CHANGED_FILES=$(git diff --name-only ${PREVIOUS_TAG}..HEAD | sort | uniq)
+          
+          # Save changelog to file for multiline output
+          cat > changelog.md << EOF
+          ## Fritz IP Updater Release ${CURRENT_TAG}
+          
+          ### 📦 Docker Image
+          Docker image is available at: \`${DOCKER_USERNAME}/fritz-ip-updater:${CURRENT_TAG}\`
+          
+          ### 🚀 Quick Start
+          \`\`\`bash
+          # Using latest tag
+          docker pull ${DOCKER_USERNAME}/fritz-ip-updater:latest
+          
+          # Or using specific version
+          docker pull ${DOCKER_USERNAME}/fritz-ip-updater:${CURRENT_TAG}
+          \`\`\`
+          
+          ### 📋 What's Changed
+          
+          **${COMMIT_COUNT} commits** since previous release:
+          
+          ${CHANGELOG}
+          
+          ### 📁 Files Modified
+          \`\`\`
+          ${CHANGED_FILES}
+          \`\`\`
+          
+          ### 🐳 Docker Features
+          - Multi-architecture support (linux/amd64, linux/arm64)
+          - Alpine Linux based (~50MB)
+          - Non-root user execution
+          - Health checks included
+          
+          ### 📖 Documentation
+          For detailed setup instructions, see the [Docker documentation](docker/DOCKER.md).
+          
+          **Full Changelog**: https://github.com/${REPOSITORY}/compare/${PREVIOUS_TAG}...${CURRENT_TAG}
+          EOF
+          
+          echo "changelog_file=changelog.md" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.create-tag.outputs.tag }}
+          release_name: Release ${{ needs.create-tag.outputs.tag }}
+          body_path: ${{ steps.generate_changelog.outputs.changelog_file }}
+          draft: false
+          prerelease: false
