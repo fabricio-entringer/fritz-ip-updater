@@ -4,6 +4,11 @@ on:
   push:
     branches: [ master ]
 
+permissions:
+  contents: write
+  packages: write
+  pull-requests: read
+
 jobs:
   create-tag:
     runs-on: ubuntu-latest
@@ -12,21 +17,26 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          fetch-depth: 0
 
       - name: Create and push tag
         id: create_tag
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           # Generate tag based on current date and time (y.m.d-h.m format)
           TAG=$(date -u +"%y.%-m.%-d-%H.%M")
           echo "tag=${TAG}" >> $GITHUB_OUTPUT
           
-          # Configure git
-          git config --local user.email "action@github.com"
-          git config --local user.name "GitHub Action"
+          # Configure git with GitHub Actions bot credentials
+          git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
           
-          # Create and push tag
+          # Create and push tag using HTTPS with token
           git tag ${TAG}
-          git push origin ${TAG}
+          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} ${TAG}
           
           echo "Created and pushed tag: ${TAG}"
 
