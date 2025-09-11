@@ -16,5 +16,9 @@ DUCKDNS_DOMAIN = os.getenv("DUCKDNS_DOMAIN", "domain")  # e.g., "entringer"
 # Update Interval in minutes
 UPDATE_INTERVAL_MINUTES = int(os.getenv("UPDATE_INTERVAL_MINUTES", "5"))
 
+# Logging Retention Days - Default is 30 days
+LOG_RETENTION_DAYS = int(os.getenv("LOG_RETENTION_DAYS", "30"))
+
 # Ensure data directory exists
-os.makedirs("./data", exist_ok=True)
+DATA_DIR = "./data"
+os.makedirs(DATA_DIR, exist_ok=True)
