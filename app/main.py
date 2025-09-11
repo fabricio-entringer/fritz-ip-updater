@@ -14,9 +14,6 @@ def get_fritzbox_status(host, user, password):
         fs = FritzStatus(fc)
 
         return {
-            'bytes_sent': fs.bytes_sent,
-            'bytes_received': fs.bytes_received,
-            'device_uptime': fs.device_uptime,
             'external_ip': fs.external_ip
         }
     except FritzConnectionException as e:
@@ -62,7 +59,7 @@ def execute_check():
         
         last_ip = get_last_ip()
 
-        if external_ip is None or external_ip != last_ip:
+        if external_ip != last_ip:
             logger.info(f"IP change detected: {last_ip} -> {external_ip}")
             if duck_dns_update(external_ip):
                 save_last_ip(external_ip)
