@@ -10,10 +10,12 @@ permissions:
   pull-requests: read
 
 jobs:
-  create-tag:
+  semantic-release:
     runs-on: ubuntu-latest
     outputs:
-      tag: ${{ steps.create_tag.outputs.tag }}
+      new-release-published: ${{ steps.semantic.outputs.new-release-published }}
+      new-release-version: ${{ steps.semantic.outputs.new-release-version }}
+      new-release-git-tag: ${{ steps.semantic.outputs.new-release-git-tag }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,28 +23,119 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           fetch-depth: 0
 
-      - name: Create and push tag
-        id: create_tag
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install semantic-release
+        run: |
+          npm install -g semantic-release @semantic-release/changelog @semantic-release/git @semantic-release/github
+
+      - name: Create semantic-release config
+        run: |
+          cat > .releaserc.json << 'EOF'
+          {
+            "branches": ["master"],
+            "tagFormat": "v${version}",
+            "repositoryUrl": "https://github.com/fabricio-entringer/fritz-ip-updater.git",
+            "plugins": [
+              [
+                "@semantic-release/commit-analyzer",
+                {
+                  "releaseRules": [
+                    {"type": "feat", "release": "minor"},
+                    {"type": "fix", "release": "patch"},
+                    {"type": "perf", "release": "patch"},
+                    {"type": "docs", "release": false},
+                    {"type": "style", "release": false},
+                    {"type": "refactor", "release": "patch"},
+                    {"type": "test", "release": false},
+                    {"type": "chore", "release": false}
+                  ]
+                }
+              ],
+              [
+                "@semantic-release/release-notes-generator",
+                {
+                  "preset": "conventionalcommits"
+                }
+              ],
+              [
+                "@semantic-release/changelog",
+                {
+                  "changelogFile": "CHANGELOG.md"
+                }
+              ],
+              [
+                "@semantic-release/git",
+                {
+                  "assets": ["CHANGELOG.md"],
+                  "message": "chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}"
+                }
+              ],
+              [
+                "@semantic-release/github",
+                {
+                  "assets": []
+                }
+              ]
+            ]
+          }
+          EOF
+
+      - name: Run semantic-release
+        id: semantic
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Generate tag based on current date and time (y.m.d-h.m format)
-          TAG=$(date -u +"%y.%-m.%-d-%H.%M")
-          echo "tag=${TAG}" >> $GITHUB_OUTPUT
-          
           # Configure git with GitHub Actions bot credentials
           git config --local user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # Create and push tag using HTTPS with token
-          git tag ${TAG}
-          git push https://x-access-token:${GITHUB_TOKEN}@github.com/${{ github.repository }} ${TAG}
+          # Check if any tags exist
+          EXISTING_TAGS=$(git tag -l | wc -l)
           
-          echo "Created and pushed tag: ${TAG}"
+          if [ "$EXISTING_TAGS" -eq 0 ]; then
+            echo "No existing tags found. Creating initial version v0.0.1"
+            
+            # Create initial tag for first release
+            git tag v0.0.1
+            git push origin v0.0.1
+            
+            # Create initial release manually for the first version
+            echo "new-release-published=true" >> $GITHUB_OUTPUT
+            echo "new-release-version=0.0.1" >> $GITHUB_OUTPUT
+            echo "new-release-git-tag=v0.0.1" >> $GITHUB_OUTPUT
+            echo "Initial release created: v0.0.1"
+          else
+            echo "Existing tags found. Running semantic-release for next version"
+            
+            # Run semantic-release and capture outputs
+            RELEASE_OUTPUT=$(npx semantic-release --dry-run=false 2>&1)
+            RELEASE_EXIT_CODE=$?
+            
+            echo "Semantic-release output:"
+            echo "$RELEASE_OUTPUT"
+            
+            # Get the latest tag (which should be the one just created)
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+            
+            if [ $RELEASE_EXIT_CODE -eq 0 ] && [ -n "$LATEST_TAG" ]; then
+              echo "new-release-published=true" >> $GITHUB_OUTPUT
+              echo "new-release-version=${LATEST_TAG#v}" >> $GITHUB_OUTPUT
+              echo "new-release-git-tag=${LATEST_TAG}" >> $GITHUB_OUTPUT
+              echo "New release created: ${LATEST_TAG}"
+            else
+              echo "new-release-published=false" >> $GITHUB_OUTPUT
+              echo "No new release created or semantic-release failed"
+            fi
+          fi
 
   build-and-push-docker:
     runs-on: ubuntu-latest
-    needs: create-tag
+    needs: semantic-release
+    if: needs.semantic-release.outputs.new-release-published == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -64,12 +157,13 @@ jobs:
           push: true
           tags: |
             ${{ secrets.DOCKER_HUB_USERNAME }}/fritz-ip-updater:latest
-            ${{ secrets.DOCKER_HUB_USERNAME }}/fritz-ip-updater:${{ needs.create-tag.outputs.tag }}
+            ${{ secrets.DOCKER_HUB_USERNAME }}/fritz-ip-updater:${{ needs.semantic-release.outputs.new-release-version }}
           platforms: linux/amd64,linux/arm64
 
   create-release:
     runs-on: ubuntu-latest
-    needs: [create-tag, build-and-push-docker]
+    needs: [semantic-release, build-and-push-docker]
+    if: needs.semantic-release.outputs.new-release-published == 'true'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -80,7 +174,7 @@ jobs:
         id: get_previous_tag
         run: |
           # Get the previous tag (excluding the one we just created)
-          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ needs.create-tag.outputs.tag }}" | head -n 1)
+          PREVIOUS_TAG=$(git tag --sort=-version:refname | grep -v "${{ needs.semantic-release.outputs.new-release-git-tag }}" | head -n 1)
           if [ -z "$PREVIOUS_TAG" ]; then
             # If no previous tag exists, use the first commit
             PREVIOUS_TAG=$(git rev-list --max-parents=0 HEAD)
@@ -92,7 +186,7 @@ jobs:
         id: generate_changelog
         env:
           DOCKER_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
-          CURRENT_TAG: ${{ needs.create-tag.outputs.tag }}
+          CURRENT_TAG: ${{ needs.semantic-release.outputs.new-release-git-tag }}
           PREVIOUS_TAG: ${{ steps.get_previous_tag.outputs.previous_tag }}
           REPOSITORY: ${{ github.repository }}
         run: |
@@ -154,8 +248,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ needs.create-tag.outputs.tag }}
-          release_name: Release ${{ needs.create-tag.outputs.tag }}
+          tag_name: ${{ needs.semantic-release.outputs.new-release-git-tag }}
+          release_name: Release ${{ needs.semantic-release.outputs.new-release-git-tag }}
           body_path: ${{ steps.generate_changelog.outputs.changelog_file }}
           draft: false
           prerelease: false
