@@ -43,6 +43,7 @@ The application requires the following configuration parameters, which should be
 
 ### Application Configuration
 - `UPDATE_INTERVAL_MINUTES` - Interval in minutes between IP checks (default: 5)
+- `LOG_RETENTION_DAYS` - Number of days to retain log files (default: 30)
 
 *Note: Future versions will support additional dynamic DNS providers.*
 
@@ -125,6 +126,8 @@ Persistent logging with timestamps including:
 - Dynamic DNS update success/failure messages
 - Error messages and exceptions
 - No-change confirmations
+
+**Log Rotation**: Log files are automatically rotated daily and retained for the number of days specified by the `LOG_RETENTION_DAYS` configuration parameter (default: 30 days). Older log files are automatically deleted to manage disk space.
 
 ### Log Format
 ```
